@@ -1,1 +1,1 @@
-# contrastive-regression
+# Semi-supervised contrastive regression
