@@ -69,6 +69,7 @@ class LinearSSCR:
             "sigma_sq": 0.1 * onp.random.normal(size=(1)),
             "tau_sq": 0.1 * onp.random.normal(size=(1)),
         }
+        
 
         # Initialize optimizer
         opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
@@ -88,7 +89,7 @@ class LinearSSCR:
             last_mll = curr_mll
             if verbose and step_num % print_every == 0:
                 print(
-                    "Step: {:<15} Log marginal lik.: {}".format(
+                    "Step: {:<15} Log likelihood: {}".format(
                         step_num, onp.round(-1 * onp.asarray(curr_mll), 2)
                     )
                 )
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     R = t @ beta + onp.random.normal(scale=tau, size=(n, 1))
 
     model = LinearSSCR()
-    model.fit(X, Y, R, d)
+    model.fit(X, Y, R, d) #, max_steps=0)
     preds = model.predict(X)
     plt.scatter(R, preds)
     plt.show()
