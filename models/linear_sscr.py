@@ -11,7 +11,7 @@ from jax.example_libraries import optimizers
 
 class LinearSSCR:
     def __init__(self):
-        pass
+        self.is_fitted = False
 
     def fit(
         self,
@@ -52,6 +52,7 @@ class LinearSSCR:
             verbose=verbose,
             print_every=print_every,
         )
+        self.is_fitted = True
 
     def set_up_objective(self):
 
@@ -62,9 +63,9 @@ class LinearSSCR:
 
     def maximize_LL(self, learning_rate, tol, max_steps, verbose, print_every):
         params = {
-            "S": 0.1 * onp.random.normal(size=(d, p)),
-            "W": 0.1 * onp.random.normal(size=(d, p)),
-            "beta": 0.1 * onp.random.normal(size=(d, 1)),
+            "S": 0.1 * onp.random.normal(size=(self.d, self.p)),
+            "W": 0.1 * onp.random.normal(size=(self.d, self.p)),
+            "beta": 0.1 * onp.random.normal(size=(self.d, 1)),
             "sigma_sq": 0.1 * onp.random.normal(size=(1)),
             "tau_sq": 0.1 * onp.random.normal(size=(1)),
         }
@@ -100,24 +101,18 @@ class LinearSSCR:
         self.sigma_sq = jnp.exp(fitted_params["sigma_sq"])
         self.tau_sq = jnp.exp(fitted_params["tau_sq"])
 
-        M = self.W @ self.W.T + self.sigma_sq * jnp.eye(self.d)
-        multiplier = jnp.linalg.solve(M, self.W)
-        t_est = self.X @ multiplier.T
+        # Transformed parameters
+        self.A = self.S @ self.S.T + self.sigma_sq * jnp.eye(self.d)
+        self.B = (
+            (self.beta @ self.beta.T) / self.tau_sq
+            + (self.W @ self.W.T) / self.sigma_sq
+            - (self.W @ self.S.T @ jnp.linalg.solve(self.A, self.S @ self.W.T))
+            / self.sigma_sq
+            + jnp.eye(self.d)
+        )
 
-        plt.figure(figsize=(10, 5))
-        plt.subplot(121)
-        plt.scatter(t[:, 0], t_est[:, 0])
-        plt.xlabel("t true")
-        plt.ylabel("t estimated")
-
-        plt.subplot(122)
-        plt.scatter(R, t_est @ self.beta)
-        plt.xlabel("R true")
-        plt.ylabel("R estimated")
-        plt.show()
-        import ipdb
-
-        ipdb.set_trace()
+        self.Ainv_S = jnp.linalg.solve(self.A, self.S)
+        self.Binv_beta = jnp.linalg.solve(self.B, self.beta)
 
     def inner_product_vectorized(self, v, A):
         # Helps compute v^T A v quickly for many v's
@@ -160,11 +155,15 @@ class LinearSSCR:
 
         # -n/2 log(tau^2 / (tau - beta^T B^-1 beta))
         first_term = (
-            -0.5 * self.n * jnp.log(tau_sq ** 2 / (tau_sq - params["beta"].T @ Binv_beta))
+            -0.5
+            * self.n
+            * jnp.log(tau_sq ** 2 / (tau_sq - params["beta"].T @ Binv_beta))
         )
 
         # -(tau - beta^T B^-1 beta) / 2tau^2 * \sum_{i=1}^n (r_i - (tau beta^T B^-1 eta_i) / (tau - beta^T B^-1 beta))
-        second_term_scalar = -0.5 * (tau_sq - params["beta"].T @ Binv_beta) / (tau_sq ** 2)
+        second_term_scalar = (
+            -0.5 * (tau_sq - params["beta"].T @ Binv_beta) / (tau_sq ** 2)
+        )
         second_term_sum = jnp.sum(
             (
                 R
@@ -191,13 +190,24 @@ class LinearSSCR:
         # Remove singleton dimension
         return jnp.squeeze(LL)
 
-    def predict(self):
-        pass
+    def predict(self, Xstar):
+
+        if not self.is_fitted:
+            raise Exception("You need to fit the model before making predictions.")
+
+        numerator = (
+            self.tau_sq
+            * self.Binv_beta.T
+            @ (self.W @ Xstar.T - self.W @ self.S.T @ self.Ainv_S @ Xstar.T)
+        )
+        denominator = self.sigma_sq * (self.tau_sq - self.beta.T @ self.Binv_beta)
+        preds = numerator / denominator
+        return preds.squeeze()
 
 
 if __name__ == "__main__":
     n = 100
-    m = 150
+    m = 100
     p = 2
     d = 1
 
@@ -210,10 +220,12 @@ if __name__ == "__main__":
     sigma = 1e-2
     tau = 1e-2
 
-    X = zx @ S + t @ W + onp.random.normal(scale=sigma)
-    Y = zy @ S + onp.random.normal(scale=sigma)
-    R = t @ beta + onp.random.normal(scale=tau)
-
+    X = zx @ S + t @ W + onp.random.normal(scale=sigma, size=(n, 2))
+    Y = zy @ S + onp.random.normal(scale=sigma, size=(m, 2))
+    R = t @ beta + onp.random.normal(scale=tau, size=(n, 1))
 
     model = LinearSSCR()
     model.fit(X, Y, R, d)
+    preds = model.predict(X)
+    plt.scatter(R, preds)
+    plt.show()
