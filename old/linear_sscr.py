@@ -21,7 +21,7 @@ class LinearSSCR:
         d,
         learning_rate=1e-2,
         tol=1e-4,
-        max_steps=1e6,
+        max_steps=1e5,
         verbose=True,
         print_every=200,
     ):
@@ -69,6 +69,7 @@ class LinearSSCR:
             "sigma_sq": 0.1 * onp.random.normal(size=(1)),
             "tau_sq": 0.1 * onp.random.normal(size=(1)),
         }
+        
 
         # Initialize optimizer
         opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
@@ -88,19 +89,12 @@ class LinearSSCR:
             last_mll = curr_mll
             if verbose and step_num % print_every == 0:
                 print(
-                    "Step: {:<15} Log marginal lik.: {}".format(
+                    "Step: {:<15} Log likelihood: {}".format(
                         step_num, onp.round(-1 * onp.asarray(curr_mll), 2)
                     )
                 )
 
         fitted_params = get_params(opt_state)
-        true_params = {
-            "S": onp.array([[-1,1]]),
-            "W": onp.array([[1,1]]),
-            "beta": onp.array([[1]]),
-            "sigma_sq": onp.array([1e-2]),
-            "tau_sq": onp.array([1e-2]),
-        }
 
         self.S = fitted_params["S"]
         self.W = fitted_params["W"]
@@ -108,21 +102,18 @@ class LinearSSCR:
         self.sigma_sq = jnp.exp(fitted_params["sigma_sq"])
         self.tau_sq = jnp.exp(fitted_params["tau_sq"])
 
-        # print('Estimated W = ',self.W)
-        # print('Estimated S = ',self.S)
-        # print('Estimated beta = ',self.beta)
-        # print('Estimated sigma = ',self.sigma_sq)
-        # print('Estimated tau = ',self.tau_sq)
         # Transformed parameters
+        self.A = self.S @ self.S.T + self.sigma_sq * jnp.eye(self.d)
+        self.B = (
+            (self.beta @ self.beta.T) / self.tau_sq
+            + (self.W @ self.W.T) / self.sigma_sq
+            - (self.W @ self.S.T @ jnp.linalg.solve(self.A, self.S @ self.W.T))
+            / self.sigma_sq
+            + jnp.eye(self.d)
+        )
 
-        self.P = self.S.T @  self.S + self.sigma_sq *jnp.eye(self.p)
-        self.Pinv = jnp.linalg.solve(self.P, jnp.eye(self.p))
-        self.A = jnp.linalg.solve(self.W @ self.Pinv @ self.W.T + jnp.eye(self.d), jnp.eye(self.d))
-
-        # microergodic parameter is the one before x in the mean of the Gaussian in equation (20): beta^T A W^T P^{-1}
-        # print('Estimated microergodic = ', self.beta.T @ self.A @ self.W @ self.Pinv)
-        # print('True microergodic = ', true_params["beta"].T @ jnp.linalg.solve(true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + true_params["sigma_sq"] * jnp.eye(self.p),jnp.eye(self.p)) @ true_params["W"].T, jnp.eye(self.d)) @ true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + true_params["sigma_sq"] * jnp.eye(self.p), jnp.eye(self.p)))
-
+        self.Ainv_S = jnp.linalg.solve(self.A, self.S)
+        self.Binv_beta = jnp.linalg.solve(self.B, self.beta)
 
     def inner_product_vectorized(self, v, A):
         # Helps compute v^T A v quickly for many v's
@@ -136,33 +127,51 @@ class LinearSSCR:
         # sigma_sq = sigma ** 2
 
         # Define transformed parameters
-
-        P = params["S"].T @ params["S"] + sigma_sq * jnp.eye(self.p)
-        Q = P + params["W"].T @ params["W"]
-        Pinv = jnp.linalg.solve(P, jnp.eye(self.p))
-        Qinv = jnp.linalg.solve(Q, jnp.eye(self.p))
-        A = jnp.linalg.solve(params["W"] @ Pinv @ params["W"].T + jnp.eye(self.d), jnp.eye(self.d))
-        eta = (
-                params["beta"].T @ A @ params["W"] @ jnp.linalg.solve(P, jnp.eye(self.p)) @ self.X.T
+        A = params["S"] @ params["S"].T + sigma_sq * jnp.eye(self.d)
+        O = params["S"].T @ params["S"] + sigma_sq * jnp.eye(self.p)
+        Q = O + params["W"].T @ params["W"]
+        B = (
+            (params["beta"] @ params["beta"].T) / tau_sq
+            + (params["W"] @ params["W"].T) / sigma_sq
+            - (
+                params["W"]
+                @ params["S"].T
+                @ jnp.linalg.solve(A, params["S"] @ params["W"].T)
+            )
+            / sigma_sq
+            + jnp.eye(self.d)
         )
 
+        eta = (
+            params["W"] @ self.X.T / sigma_sq
+            - params["W"]
+            @ params["S"].T
+            @ jnp.linalg.solve(A, params["S"] @ self.X.T)
+            / sigma_sq
+        )
 
+        Binv_beta = jnp.linalg.solve(B, params["beta"])
+        Oinv = jnp.linalg.solve(O, jnp.eye(self.p))
+        Qinv = jnp.linalg.solve(Q, jnp.eye(self.p))
 
-        # -n/2 log(tau^2 + beta^T A beta)
+        # -n/2 log(tau^2 / (tau - beta^T B^-1 beta))
         first_term = (
             -0.5
             * self.n
-            * jnp.log(tau_sq + params["beta"].T @ A @ params["beta"])
+            * jnp.log(tau_sq ** 2 / (tau_sq - params["beta"].T @ Binv_beta))
         )
 
-        # -1 / 2(tau^2 + beta^T A beta) * \sum_{i=1}^n (r_i - )^2
+        # -(tau - beta^T B^-1 beta) / 2tau^2 * \sum_{i=1}^n (r_i - (tau beta^T B^-1 eta_i) / (tau - beta^T B^-1 beta))
         second_term_scalar = (
-            -0.5 / (tau_sq  + params["beta"].T @ A @ params["beta"])
+            -0.5 * (tau_sq - params["beta"].T @ Binv_beta) / (tau_sq ** 2)
         )
         second_term_sum = jnp.sum(
             (
                 R
-                - eta.T
+                - tau_sq
+                * params["beta"].T
+                @ jnp.linalg.solve(B, eta)
+                / (tau_sq - params["beta"].T @ Binv_beta)
             )
             ** 2
         )
@@ -172,9 +181,9 @@ class LinearSSCR:
         xQx = vmap(lambda x: self.inner_product_vectorized(x, Qinv))(X)
         third_term = -0.5 * self.n * jnp.linalg.slogdet(Q)[1] - 0.5 * jnp.sum(xQx)
 
-        # -m/2 log det(P) - 0.5 * \sum_{j=1}^m y_j^T P^-1 y_j
-        yPy = vmap(lambda y: self.inner_product_vectorized(y, Pinv))(Y)
-        fourth_term = -0.5 * self.m * jnp.linalg.slogdet(P)[1] - 0.5 * jnp.sum(yPy)
+        # -m/2 log det(O) - 0.5 * \sum_{j=1}^m y_j^T O^-1 y_j
+        yOy = vmap(lambda y: self.inner_product_vectorized(y, Oinv))(Y)
+        fourth_term = -0.5 * self.m * jnp.linalg.slogdet(O)[1] - 0.5 * jnp.sum(yOy)
 
         # Complete log likelihood is sum of these terms
         LL = first_term + second_term + third_term + fourth_term
@@ -187,16 +196,13 @@ class LinearSSCR:
         if not self.is_fitted:
             raise Exception("You need to fit the model before making predictions.")
 
-        preds = self.beta.T @ self.A @ self.W @ self.Pinv @ Xstar.T
-
-        # true_params = {
-        #     "S": onp.array([[-1, 1]]),
-        #     "W": onp.array([[1, 1]]),
-        #     "beta": onp.array([[1]]),
-        #     "sigma_sq": 1e-2,
-        #     "tau_sq": 1e-2,
-        # }
-        #preds = true_params["beta"].T @ jnp.linalg.solve(true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + jnp.eye(self.p),jnp.eye(self.p)) @ true_params["W"].T, jnp.eye(self.d)) @ true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + jnp.eye(self.p), jnp.eye(self.p)) @ Xstar.T
+        numerator = (
+            self.tau_sq
+            * self.Binv_beta.T
+            @ (self.W @ Xstar.T - self.W @ self.S.T @ self.Ainv_S @ Xstar.T)
+        )
+        denominator = self.sigma_sq * (self.tau_sq - self.beta.T @ self.Binv_beta)
+        preds = numerator / denominator
         return preds.squeeze()
 
 
@@ -220,7 +226,7 @@ if __name__ == "__main__":
     R = t @ beta + onp.random.normal(scale=tau, size=(n, 1))
 
     model = LinearSSCR()
-    model.fit(X, Y, R, d)
+    model.fit(X, Y, R, d) #, max_steps=0)
     preds = model.predict(X)
     plt.scatter(R, preds)
     plt.show()
