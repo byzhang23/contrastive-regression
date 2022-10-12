@@ -36,13 +36,13 @@ class LinearSSCR:
         m, _ = Y.shape
         assert d <= p
 
-        self.X = X
-        self.Y = Y
-        self.R = R
-        self.n = n
-        self.m = m
-        self.p = p
-        self.d = d
+        self.X = X # Foreground matrix
+        self.Y = Y # Background matrix
+        self.R = R # Response vector
+        self.n = n # Num. FG
+        self.m = m # Num. BG
+        self.p = p # Num. of genes
+        self.d = d # Dimension of latent space
 
         self.set_up_objective()
         self.maximize_LL(
