@@ -16,8 +16,8 @@ t = onp.random.normal(size=(n, d))     # Foreground-specific latent variables
 W = onp.random.normal(size=(d, p))     # Foreground-specific loadings matrix
 S = onp.random.normal(size=(d, p))     # Shared loadings matrix
 beta = onp.random.normal(size=(d, 1))  # Coefficient vector
-sigma = 1e-2						   # Data matrix noise variance
-tau = 1e-2							   # Response noise variance
+sigma = 1e-2                           # Data matrix noise variance
+tau = 1e-2                             # Response noise variance
 
 # Foreground data
 X = zx @ S + t @ W + onp.random.normal(scale=sigma, size=(n, 2))
