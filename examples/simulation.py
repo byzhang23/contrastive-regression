@@ -12,7 +12,7 @@ matplotlib.rcParams["text.usetex"] = True
 import sys
 
 sys.path.append("../models")
-from linear_sscr import LinearSSCR
+from linear_sscr import LinearCR
 
 n = 100
 m = 150

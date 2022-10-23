@@ -9,19 +9,23 @@ import jax.scipy as scipy
 from jax.example_libraries import optimizers
 
 
-class LinearSSCR:
+# Class for linear contrastive regression
+class LinearCR:
+
+    # Constructor
     def __init__(self):
         self.is_fitted = False
 
+    # Fit the model
     def fit(
         self,
-        X,
-        Y,
-        R,
-        d,
+        X,                      # Foreground data matrix (n x p)
+        Y,                      # Background data matrix (m x p)
+        R,                      # Response vector (n x 1)
+        d,                      # Latent dimension
         learning_rate=1e-2,
-        tol=1e-4,
-        max_steps=1e6,
+        tol=1e-4,               # Optimization tolerance
+        max_steps=1e6,          # Max number of optimization steps
         verbose=True,
         print_every=200,
     ):
@@ -36,6 +40,7 @@ class LinearSSCR:
         m, _ = Y.shape
         assert d <= p
 
+        # Store data and dimensions as class properties
         self.X = X # Foreground matrix
         self.Y = Y # Background matrix
         self.R = R # Response vector
@@ -44,7 +49,10 @@ class LinearSSCR:
         self.p = p # Num. of genes
         self.d = d # Dimension of latent space
 
+        # Set up log likelihood objective
         self.set_up_objective()
+
+        # Maximize log likelihood
         self.maximize_LL(
             learning_rate=learning_rate,
             tol=tol,
@@ -52,8 +60,11 @@ class LinearSSCR:
             verbose=verbose,
             print_every=print_every,
         )
+
+        # Model is now fitted
         self.is_fitted = True
 
+    # Sets up log likelihood function
     def set_up_objective(self):
 
         # Minimize negative log likelihood
@@ -61,6 +72,7 @@ class LinearSSCR:
             params, self.X, self.Y, self.R
         )
 
+    # Runs optimization to maximize log likelihood
     def maximize_LL(self, learning_rate, tol, max_steps, verbose, print_every):
         params = {
             "S": 0.1 * onp.random.normal(size=(self.d, self.p)),
@@ -74,12 +86,15 @@ class LinearSSCR:
         opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
         opt_state = opt_init(params)
 
+        # Step function that performs one step of optimization
+        # Use JIT to speed up repeated calls
         @jit
         def step(step, opt_state):
             value, grads = value_and_grad(self.objective)(get_params(opt_state))
             opt_state = opt_update(step, grads, opt_state)
             return value, opt_state
 
+        # Optimization loop
         last_mll = onp.inf
         for step_num in range(int(max_steps)):
             curr_mll, opt_state = step(step_num, opt_state)
@@ -93,14 +108,15 @@ class LinearSSCR:
                     )
                 )
 
+        # Store fitted parameter values
         fitted_params = get_params(opt_state)
-        true_params = {
-            "S": onp.array([[-1,1]]),
-            "W": onp.array([[1,1]]),
-            "beta": onp.array([[1]]),
-            "sigma_sq": onp.array([1e-2]),
-            "tau_sq": onp.array([1e-2]),
-        }
+        # true_params = {
+        #     "S": onp.array([[-1,1]]),
+        #     "W": onp.array([[1,1]]),
+        #     "beta": onp.array([[1]]),
+        #     "sigma_sq": onp.array([1e-2]),
+        #     "tau_sq": onp.array([1e-2]),
+        # }
 
         self.S = fitted_params["S"]
         self.W = fitted_params["W"]
@@ -182,6 +198,7 @@ class LinearSSCR:
         # Remove singleton dimension
         return jnp.squeeze(LL)
 
+    # Make predictions for R given new foreground sample(s)
     def predict(self, Xstar):
 
         if not self.is_fitted:
@@ -219,7 +236,7 @@ if __name__ == "__main__":
     Y = zy @ S + onp.random.normal(scale=sigma, size=(m, 2))
     R = t @ beta + onp.random.normal(scale=tau, size=(n, 1))
 
-    model = LinearSSCR()
+    model = LinearCR()
     model.fit(X, Y, R, d)
     preds = model.predict(X)
     plt.scatter(R, preds)
