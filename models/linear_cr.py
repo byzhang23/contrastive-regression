@@ -139,6 +139,8 @@ class LinearCR:
         # print('Estimated microergodic = ', self.beta.T @ self.A @ self.W @ self.Pinv)
         # print('True microergodic = ', true_params["beta"].T @ jnp.linalg.solve(true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + true_params["sigma_sq"] * jnp.eye(self.p),jnp.eye(self.p)) @ true_params["W"].T, jnp.eye(self.d)) @ true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + true_params["sigma_sq"] * jnp.eye(self.p), jnp.eye(self.p)))
 
+        # Compute posterior mean of foreground-specific latent variables
+        self.t = (self.A @ self.W @ jnp.linalg.solve(self.P, self.X.T)).T
 
     def inner_product_vectorized(self, v, A):
         # Helps compute v^T A v quickly for many v's
