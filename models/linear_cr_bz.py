@@ -10,7 +10,7 @@ from jax.example_libraries import optimizers
 
 
 # Class for linear contrastive regression
-class LinearCR:
+class LinearCRBZ:
 
     # Constructor
     def __init__(self):
@@ -132,7 +132,9 @@ class LinearCR:
         # Transformed parameters
 
         self.P = self.S.T @  self.S + self.sigma_sq *jnp.eye(self.p)
-        self.Pinv = jnp.linalg.solve(self.P, jnp.eye(self.p))
+        # self.Pinv = jnp.linalg.solve(self.P, jnp.eye(self.p))
+        # BZ
+        self.Pinv = 1/self.sigma_sq * jnp.eye(self.p) - 1/(self.sigma_sq**2) * self.S.T @ jnp.linalg.solve(jnp.eye(self.d) + 1/self.sigma_sq * self.S @ self.S.T ,jnp.eye(self.d)) @ self.S
         self.A = jnp.linalg.solve(self.W @ self.Pinv @ self.W.T + jnp.eye(self.d), jnp.eye(self.d))
 
         # microergodic parameter is the one before x in the mean of the Gaussian in equation (20): beta^T A W^T P^{-1}
@@ -140,7 +142,9 @@ class LinearCR:
         # print('True microergodic = ', true_params["beta"].T @ jnp.linalg.solve(true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + true_params["sigma_sq"] * jnp.eye(self.p),jnp.eye(self.p)) @ true_params["W"].T, jnp.eye(self.d)) @ true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + true_params["sigma_sq"] * jnp.eye(self.p), jnp.eye(self.p)))
 
         # Compute posterior mean of foreground-specific latent variables
-        self.t = (self.A @ self.W @ jnp.linalg.solve(self.P, self.X.T)).T
+        # self.t = (self.A @ self.W @ jnp.linalg.solve(self.P, self.X.T)).T
+        # BZ
+        self.t = (self.A @ self.W @ self.Pinv @self.X.T).T
 
     def inner_product_vectorized(self, v, A):
         # Helps compute v^T A v quickly for many v's
@@ -157,7 +161,9 @@ class LinearCR:
 
         P = params["S"].T @ params["S"] + sigma_sq * jnp.eye(self.p)
         Q = P + params["W"].T @ params["W"]
-        Pinv = jnp.linalg.solve(P, jnp.eye(self.p))
+        # Pinv = jnp.linalg.solve(P, jnp.eye(self.p))
+        # BZ
+        Pinv = 1/sigma_sq * jnp.eye(self.p) - 1/(sigma_sq**2) * params["S"].T @ jnp.linalg.solve(jnp.eye(self.d) + 1/sigma_sq * params["S"] @ params["S"].T ,jnp.eye(self.d)) @ params["S"]
         Qinv = jnp.linalg.solve(Q, jnp.eye(self.p))
         A = jnp.linalg.solve(params["W"] @ Pinv @ params["W"].T + jnp.eye(self.d), jnp.eye(self.d))
         eta = (
