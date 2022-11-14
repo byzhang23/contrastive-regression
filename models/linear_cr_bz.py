@@ -166,8 +166,11 @@ class LinearCRBZ:
         Pinv = 1/sigma_sq * jnp.eye(self.p) - 1/(sigma_sq**2) * params["S"].T @ jnp.linalg.solve(jnp.eye(self.d) + 1/sigma_sq * params["S"] @ params["S"].T ,jnp.eye(self.d)) @ params["S"]
         Qinv = jnp.linalg.solve(Q, jnp.eye(self.p))
         A = jnp.linalg.solve(params["W"] @ Pinv @ params["W"].T + jnp.eye(self.d), jnp.eye(self.d))
+        
         eta = (
-                params["beta"].T @ A @ params["W"] @ jnp.linalg.solve(P, jnp.eye(self.p)) @ self.X.T
+                # BZ
+                # params["beta"].T @ A @ params["W"] @ jnp.linalg.solve(P, jnp.eye(self.p)) @ self.X.T
+                params["beta"].T @ A @ params["W"] @ Pinv @ self.X.T
         )
 
 
