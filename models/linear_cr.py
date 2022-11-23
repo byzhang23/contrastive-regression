@@ -19,13 +19,13 @@ class LinearCR:
     # Fit the model
     def fit(
         self,
-        X,                      # Foreground data matrix (n x p)
-        Y,                      # Background data matrix (m x p)
-        R,                      # Response vector (n x 1)
-        d,                      # Latent dimension
+        X,  # Foreground data matrix (n x p)
+        Y,  # Background data matrix (m x p)
+        R,  # Response vector (n x 1)
+        d,  # Latent dimension
         learning_rate=1e-2,
-        tol=1e-4,               # Optimization tolerance
-        max_steps=1e6,          # Max number of optimization steps
+        tol=1e-4,  # Optimization tolerance
+        max_steps=1e6,  # Max number of optimization steps
         verbose=True,
         print_every=200,
     ):
@@ -41,13 +41,13 @@ class LinearCR:
         assert d <= p
 
         # Store data and dimensions as class properties
-        self.X = X # Foreground matrix
-        self.Y = Y # Background matrix
-        self.R = R # Response vector
-        self.n = n # Num. FG
-        self.m = m # Num. BG
-        self.p = p # Num. of genes
-        self.d = d # Dimension of latent space
+        self.X = X  # Foreground matrix
+        self.Y = Y  # Background matrix
+        self.R = R  # Response vector
+        self.n = n  # Num. FG
+        self.m = m  # Num. BG
+        self.p = p  # Num. of genes
+        self.d = d  # Dimension of latent space
 
         # Set up log likelihood objective
         self.set_up_objective()
@@ -131,9 +131,11 @@ class LinearCR:
         # print('Estimated tau = ',self.tau_sq)
         # Transformed parameters
 
-        self.P = self.S.T @  self.S + self.sigma_sq *jnp.eye(self.p)
+        self.P = self.S.T @ self.S + self.sigma_sq * jnp.eye(self.p)
         self.Pinv = jnp.linalg.solve(self.P, jnp.eye(self.p))
-        self.A = jnp.linalg.solve(self.W @ self.Pinv @ self.W.T + jnp.eye(self.d), jnp.eye(self.d))
+        self.A = jnp.linalg.solve(
+            self.W @ self.Pinv @ self.W.T + jnp.eye(self.d), jnp.eye(self.d)
+        )
 
         # microergodic parameter is the one before x in the mean of the Gaussian in equation (20): beta^T A W^T P^{-1}
         # print('Estimated microergodic = ', self.beta.T @ self.A @ self.W @ self.Pinv)
@@ -159,31 +161,25 @@ class LinearCR:
         Q = P + params["W"].T @ params["W"]
         Pinv = jnp.linalg.solve(P, jnp.eye(self.p))
         Qinv = jnp.linalg.solve(Q, jnp.eye(self.p))
-        A = jnp.linalg.solve(params["W"] @ Pinv @ params["W"].T + jnp.eye(self.d), jnp.eye(self.d))
-        eta = (
-                params["beta"].T @ A @ params["W"] @ jnp.linalg.solve(P, jnp.eye(self.p)) @ self.X.T
+        A = jnp.linalg.solve(
+            params["W"] @ Pinv @ params["W"].T + jnp.eye(self.d), jnp.eye(self.d)
         )
-
-
+        eta = (
+            params["beta"].T
+            @ A
+            @ params["W"]
+            @ jnp.linalg.solve(P, jnp.eye(self.p))
+            @ self.X.T
+        )
 
         # -n/2 log(tau^2 + beta^T A beta)
         first_term = (
-            -0.5
-            * self.n
-            * jnp.log(tau_sq + params["beta"].T @ A @ params["beta"])
+            -0.5 * self.n * jnp.log(tau_sq + params["beta"].T @ A @ params["beta"])
         )
 
         # -1 / 2(tau^2 + beta^T A beta) * \sum_{i=1}^n (r_i - )^2
-        second_term_scalar = (
-            -0.5 / (tau_sq  + params["beta"].T @ A @ params["beta"])
-        )
-        second_term_sum = jnp.sum(
-            (
-                R
-                - eta.T
-            )
-            ** 2
-        )
+        second_term_scalar = -0.5 / (tau_sq + params["beta"].T @ A @ params["beta"])
+        second_term_sum = jnp.sum((R - eta.T) ** 2)
         second_term = second_term_scalar * second_term_sum
 
         # -n/2 log det(Q) - 0.5 * \sum_{i=1}^n x_i^T Q^-1 x_i
@@ -215,7 +211,7 @@ class LinearCR:
         #     "sigma_sq": 1e-2,
         #     "tau_sq": 1e-2,
         # }
-        #preds = true_params["beta"].T @ jnp.linalg.solve(true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + jnp.eye(self.p),jnp.eye(self.p)) @ true_params["W"].T, jnp.eye(self.d)) @ true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + jnp.eye(self.p), jnp.eye(self.p)) @ Xstar.T
+        # preds = true_params["beta"].T @ jnp.linalg.solve(true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + jnp.eye(self.p),jnp.eye(self.p)) @ true_params["W"].T, jnp.eye(self.d)) @ true_params["W"] @ jnp.linalg.solve(true_params["S"].T @ true_params["S"] + jnp.eye(self.p), jnp.eye(self.p)) @ Xstar.T
         return preds.squeeze()
 
 
