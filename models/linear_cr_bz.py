@@ -23,6 +23,7 @@ class LinearCRBZ:
         Y,  # Background data matrix (m x p)
         R,  # Response vector (n x 1)
         d,  # Latent dimension
+        seed=1, # BZ: random seed
         learning_rate=1e-2,
         tol=1e-4,  # Optimization tolerance
         max_steps=1e6,  # Max number of optimization steps
@@ -54,6 +55,7 @@ class LinearCRBZ:
 
         # Maximize log likelihood
         self.maximize_LL(
+            seed=seed, # BZ
             learning_rate=learning_rate,
             tol=tol,
             max_steps=max_steps,
@@ -73,7 +75,10 @@ class LinearCRBZ:
         )
 
     # Runs optimization to maximize log likelihood
-    def maximize_LL(self, learning_rate, tol, max_steps, verbose, print_every):
+    # BZ (add seed)
+    def maximize_LL(self, seed, learning_rate, tol, max_steps, verbose, print_every):
+        # BZ
+        onp.random.seed(seed)
         params = {
             "S": 0.1 * onp.random.normal(size=(self.d, self.p)),
             "W": 0.1 * onp.random.normal(size=(self.d, self.p)),
