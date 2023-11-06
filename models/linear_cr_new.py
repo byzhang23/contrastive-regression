@@ -10,7 +10,7 @@ from jax.example_libraries import optimizers
 
 
 # Class for linear contrastive regression
-class LinearCRBZ:
+class LinearContrastiveRegression:
 
     # Constructor
     def __init__(self):
@@ -309,7 +309,7 @@ if __name__ == "__main__":
     Y = zy @ S + onp.random.normal(scale=sigma, size=(m, 2))
     R = t @ beta + onp.random.normal(scale=tau, size=(n, 1))
 
-    model = LinearCRBZ()
+    model = LinearContrastiveRegression()
     model.fit(X, Y, R, d)
     preds = model.predict(X)
     plt.scatter(R, preds)
