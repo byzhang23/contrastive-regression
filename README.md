@@ -1,6 +1,6 @@
 # Contrastive regression
 
-The Python file for the linear contrastive regression model is `models/linear_cr.py`.
+The Python file for the linear contrastive regression model is `models/linear_cr_new.py`.
 
 An example of how to fit the model and make predictions is below.
 
