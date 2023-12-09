@@ -1,0 +1,199 @@
+---
+title: "Methods Comparison"
+output: html_document
+date: "2023-03-27"
+author: BZ
+---
+
+```{r setup, warning=F, message=FALSE}
+library(dplyr)
+library(pheatmap)
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(ggrepel)
+library(gridExtra)
+library(GGally)
+```
+
+### Read in contrastive regression results
+
+```{r read in data}
+ct <-  'L2or3' # cell type
+score <- 'scoreA' # score
+
+output_dir <- paste0('./',score,'/')
+
+score <- readRDS(paste0('../',score,'_pfc.rds')) %>% mutate(group = ifelse(diagnosis == 'ASD', 1, 0))
+w <- readRDS(paste0(output_dir,'W.rds')) %>% as.matrix
+rownames(w) <- paste0('Dim',1:nrow(w))
+t <- readRDS(paste0(output_dir,'t.rds')) %>% as.matrix
+rownames(t) <- score$sample[score$diagnosis=='ASD']
+s <- readRDS(paste0(output_dir,'S.rds')) %>% as.matrix
+rownames(s) <- paste0('Dim',1:nrow(w))
+beta <- readRDS(paste0(output_dir,'beta.rds')) %>% unlist %>% as.numeric
+names(beta) <- paste0('Dim',1:nrow(w))
+pb <- readRDS(paste0('../pb/',ct,'.rds'))
+
+message(paste0('Pick the largest absolute value of beta: ', names(sort(abs(beta)))[length(beta)]))
+sort(abs(beta))
+t_row_annot <- suppressMessages(inner_join(data.frame(sample = rownames(t)),
+                                           score %>% filter(diagnosis == 'ASD') %>% select(-c(individual))))
+rownames(t_row_annot) <- t_row_annot$sample
+```
+
+### Methods Comparison
+
+#### 1. Contrastive regression
+
+```{r}
+dt <- read.csv(paste0(output_dir,'gene_rank_max_abs_beta.csv'))
+summary_lcr <- dt %>%
+  rename(coef_contrastive_both = Dim2,
+         rank_contrastive_both = rank)
+head(summary_lcr,10)
+```
+
+##### 2. linear regression (foreground-only)
+```{r}
+expr <- pb[dt$gene,score$sample]
+foreground_meta <- score[score$diagnosis == 'ASD',]
+foreground_expr <- expr[,foreground_meta$sample]
+identical(colnames(foreground_expr), foreground_meta$sample)
+
+# 
+# z_foreground <- solve(s %*% t(s)) %*% s %*% (foreground_expr - t(w) %*% t(t))
+# background_expr <- expr[,score$diagnosis == 'Control']
+# z_background <- solve(s %*% t(s)) %*% s %*% (background_expr)
+# 
+# auxiliary_foreground <- t(s) %*% z_foreground
+# auxiliary_background <- t(s) %*% z_background
+# contrastive_foreground <- foreground_expr - auxiliary_foreground
+# contrastive_background <- background_expr - auxiliary_background
+# 
+# contrastive_comb <- cbind(contrastive_foreground,contrastive_background)
+# diagnosis_col <- c('#AF46B4','#4BB446'); names(diagnosis_col) <- c('ASD','Control')
+# identical(score$sample, colnames(contrastive_comb))
+# annotation_col <- score[,c('diagnosis'),drop = F]
+# rownames(annotation_col) <- score$sample
+```
+
+```{r}
+if(identical(colnames(foreground_expr), foreground_meta$sample)){
+  coef_lm_foreground <- c()
+  pval_lm_foreground <- c()
+  for(i in 1:nrow(foreground_expr)){
+    fit <- lm(foreground_expr[i,] ~ foreground_meta$zscore)
+    coef_lm_foreground[i] <- coef(fit)[2]
+    pval_lm_foreground[i] <- summary(fit)$coef[2,4]
+  }
+  # rank based on absolute value of coefficients
+  summary_reg <- data.frame(gene = rownames(foreground_expr),
+                            coef_lm_foreground = coef_lm_foreground,
+                            pval_lm_foreground = pval_lm_foreground) %>%
+    arrange(-abs(coef_lm_foreground)) %>%
+    #arrange(pval_lm_foreground) %>%
+    mutate(rank_lm_foreground = 1:nrow(foreground_expr))
+  head(summary_reg,10)
+}
+```
+
+##### 3. logistic regression (both)
+```{r}
+if(identical(colnames(expr), score$sample)){
+  coef_logistic_both <- c()
+  pval_logistic_both <- c()
+  for(i in 1:nrow(expr)){
+    fit_logistic <- glm(score$group ~ expr[i,], family = 'binomial')
+    coef_logistic_both[i] <- coef(fit_logistic)[2]
+    pval_logistic_both[i] <- summary(fit_logistic)$coef[2,4]
+  }
+  
+  # rank based on absolute value of coefficients
+  summary_logistic <- data.frame(gene = rownames(expr),
+                                 coef_logistic_both = coef_logistic_both,
+                                 pval_logistic_both = pval_logistic_both) %>%
+    #arrange(pval_logistic_both) %>%
+    arrange(-abs(coef_logistic_both)) %>%
+    mutate(rank_logistic_both = 1:nrow(expr))
+  head(summary_logistic, 10)
+}
+
+```
+
+##### 4. linear regression (both, recalculate z-score (impute 0 for NA))
+```{r}
+meta_impute <- score %>% mutate(ADIR.A = ifelse(is.na(ADIR.A),0,ADIR.A))
+meta_impute$zscore <- (meta_impute$ADIR.A-mean(meta_impute$ADIR.A))/sd(meta_impute$ADIR.A)
+
+if(identical(colnames(expr), meta_impute$sample)){
+  coef_lm_both <- c()
+  pval_lm_both <- c()
+  for(i in 1:nrow(expr)){
+    fit <- lm(expr[i,] ~ meta_impute$zscore)
+    coef_lm_both[i] <- coef(fit)[2]
+    pval_lm_both[i] <- summary(fit)$coef[2,4]
+  }
+  
+  # rank based on absolute value of coefficients
+  summary_impute <- data.frame(gene = rownames(expr),
+                               coef_lm_both = coef_lm_both,
+                               pval_lm_both = pval_lm_both) %>%
+    arrange(-abs(coef_lm_both)) %>%
+    #arrange(pval_lm_both) %>%
+    mutate(rank_lm_both = 1:nrow(expr))
+  head(summary_impute, 10)
+}
+```
+```{r}
+# gene ranking
+summary_impute_draw <- summary_impute %>% mutate(top10 = ifelse(gene %in% summary_lcr$gene[1:10],'yes','no'))
+ggplot(summary_impute_draw, aes(x = rank_lm_both, y = abs(coef_lm_both))) +
+    geom_point() +
+    geom_point(data = summary_impute_draw %>% filter(top10 == 'yes'), color = 'red') + 
+    theme_classic(base_size=12) +
+    geom_text_repel(data = summary_impute %>% filter(gene %in% summary_lcr$gene[1:10]), 
+                    aes(label = gene), color = 'red', max.overlaps=Inf) +
+  scale_color_manual(breaks = c('yes','no'),
+                     values = c('red','black')) +
+  labs(x = 'Gene Index', y = 'Absolute value of\nregression coefficient' )
+ggsave(paste0(output_dir, 'loading_generank_regression.png'), height = 3, width = 6)
+```
+
+##### 5. summary
+```{r, message=FALSE}
+summary <- inner_join(summary_reg, summary_lcr) %>% 
+  inner_join(summary_logistic) %>%
+  inner_join(summary_impute)
+cor(summary$rank_contrastive_both,summary$rank_lm_foreground, method = 's') # 0.37
+cor(summary$rank_contrastive_both,summary$rank_logistic_both, method = 's') # -0.20
+cor(summary$rank_contrastive_both,summary$rank_lm_both, method = 's') # 0.44
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+  par(usr = c(0, 1, 0, 1))
+  r <- (cor(x, y,method = 's'))
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt)
+}
+pairs(summary[,grepl('rank',colnames(summary))], lower.panel = panel.cor, upper.panel = panel.smooth,
+      gap=1, row1attop=T)
+
+```
+
+
+```{r top10, message=FALSE}
+top10.list <- summary %>% 
+  filter(rank_lm_foreground %in% 1:10 | rank_contrastive_both %in% 1:10 | rank_logistic_both %in% 1:10 | rank_lm_both %in% 1:10) %>% 
+  select(gene, rank_lm_foreground, rank_contrastive_both, rank_logistic_both, rank_lm_both)
+
+# annotate with AutDB
+db <- read.csv('../../../raw_data/autism-gene-dataset/gene-summary.csv') %>%
+    select(Gene.Symbol, Molecular.Function, Support.for.Autism) %>%
+    dplyr::rename(gene = Gene.Symbol)
+annot <- left_join(top10.list,db)
+write.csv(annot, 'methods_compare_scoreA_top10.csv', row.names = F)
+```
+
