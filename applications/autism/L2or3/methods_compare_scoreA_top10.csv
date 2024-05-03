@@ -1,0 +1,33 @@
+"gene","rank_lm_foreground","rank_contrastive_both","rank_logistic_both","rank_lm_both","Molecular.Function","Support.for.Autism"
+"BCYRN1",1,25,712,2,NA,NA
+"LINC00486",2,3,915,13,NA,NA
+"MALAT1",3,1,897,1,NA,NA
+"PHACTR1",4,33,948,171,NA,NA
+"ROBO2",5,13,941,952,"The protein encoded by this gene belongs to the ROBO family, part of the immunoglobulin superfamily of proteins that are highly conserved from fly to human. The encoded protein is a transmembrane receptor for the slit homolog 2 protein and functions in axon guidance and cell migration.","Functional"
+"PDE10A",6,615,553,24,NA,NA
+"INO80D",7,48,907,53,NA,NA
+"RASGEF1B",8,2,912,3,NA,NA
+"LRRC4C",9,111,935,133,"NGL1 is a specific binding partner for netrin G1 (NTNG1), which is a member of the netrin family of axon guidance molecules, and it may promote neurite outgrowth of developing thalamic neurons.","Rare single gene variant"
+"FAM19A1",10,73,825,514,NA,NA
+"PCDH9",11,5,769,72,"encodes a cadherin-related neuronal receptor that localizes to synaptic junction s","Rare Single Gene variant"
+"NRXN3",19,9,947,983,"Neurexins are a family of proteins that function in the vertebrate nervous system as cell adhesion molecules and receptors. NRXN3 is one of the largest known human genes. It utilizes two alternate promoters and includes numerous alternatively spliced exons to generate thousands of distinct mRNA transcripts and protein isoforms. The majority of transcripts are produced from the upstream promoter and encode alpha-neurexin isoforms; a much smaller number of transcripts are produced from the downstream promoter and encode beta-neurexin isoforms.","Rare Single Gene variant"
+"CHN1",20,28,700,10,NA,NA
+"LPHN3",22,17,337,9,NA,NA
+"PTPRD",26,6,784,93,NA,NA
+"MEG3",44,7,417,4,NA,NA
+"SYT1",73,8,782,73,"The synaptotagmins are integral membrane proteins of synaptic vesicles thought to serve as Ca(2+) sensors in the process of vesicular trafficking and exocytosis. Calcium binding to synaptotagmin-1 participates in triggering neurotransmitter release at the synapse.","Rare single gene variant"
+"PPP3CA",77,39,232,8,"The protein encoded by the PPP3CA gene is a calcium-dependent, calmodulin-stimulated protein phosphatase which plays an essential role in the transduction of intracellular Ca2+-mediated signals.  Heterozygous variants in this gene are responsible for two distinct disorders:  arthrogryposis, cleft palate, craniosynostosis, and impaired intellectual development (ACCIID; OMIM 618265), and developmental and epileptic encephalopathy-91 (DEE91; OMIM 617711).","Syndromic"
+"CAMK2N1",284,62,620,5,NA,NA
+"MPDZ",294,324,7,174,NA,NA
+"PEA15",355,370,9,218,NA,NA
+"MTND2P28",428,973,1,643,NA,NA
+"SAT2",507,619,4,132,NA,NA
+"AC011288.2",579,22,649,6,NA,NA
+"CADM2",666,4,660,7,"Adhesion molecule that engages in homo- and heterophilic interactions with the other nectin-like family members, leading to cell aggregation. Important for synapse organization, providing regulated trans-synaptic adhesion.","Genetic association"
+"RALYL",727,10,546,31,NA,NA
+"RP11-977G19.5",740,949,5,491,NA,NA
+"MTURN",754,563,6,244,NA,NA
+"CAPNS1",769,718,10,461,NA,NA
+"TCF25",797,829,3,219,NA,NA
+"RP11-750B16.1",957,993,2,217,NA,NA
+"PAFAH1B2",973,854,8,355,"Platelet-activating factor acetylhydrolase (PAFAH) inactivates platelet-activating factor (PAF) into acetate and LYSO-PAF. This gene encodes the beta subunit of PAFAH, the other subunits are alpha and gamma.","Rare single gene variant"
